@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: ugc-ad-generator
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: ANTHROPIC_API_KEY
+        sync: false        # you will be prompted for this in the Render dashboard
+      - key: ACCESS_CODE
+        sync: false        # optional but recommended: a password for your public URL
