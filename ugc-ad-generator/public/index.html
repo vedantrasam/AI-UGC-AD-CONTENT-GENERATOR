@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UGC Ad Generator</title>
+<style>
+  :root{
+    --bg:#faf9f6; --card:#ffffff; --border:#e4e1d8; --text:#1f1e1a;
+    --muted:#6b6a63; --accent:#b5502f; --accent-bg:#f5e6de; --ok:#2f7a4f;
+  }
+  *{box-sizing:border-box;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--text); margin:0; padding:24px 16px 64px; line-height:1.55;
+  }
+  .wrap{max-width:780px; margin:0 auto;}
+  h1{font-size:22px; font-weight:650; margin:0 0 4px;}
+  .sub{color:var(--muted); font-size:14px; margin:0 0 22px;}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:18px 20px; margin-bottom:16px;}
+  .card h2{font-size:15px; font-weight:600; margin:0 0 4px; display:flex; align-items:center; gap:8px;}
+  .card p.hint{color:var(--muted); font-size:13px; margin:0 0 12px;}
+  .step-num{background:var(--accent); color:#fff; width:20px; height:20px; border-radius:50%;
+    display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:600;}
+  label{display:block; font-size:12px; font-weight:600; color:var(--muted); margin:12px 0 4px;}
+  input[type=text], input[type=password], select{
+    width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px;
+    font-size:14px; font-family:inherit; background:#fff; color:var(--text);
+  }
+  .row{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  @media (max-width:600px){ .row{grid-template-columns:1fr;} }
+  button{background:var(--accent); color:#fff; border:none; border-radius:6px; padding:9px 16px;
+    font-size:13px; font-weight:600; cursor:pointer; margin:14px 8px 0 0;}
+  button:disabled{background:#c9c5b8; cursor:not-allowed;}
+  button.ghost{background:#fff; color:var(--accent); border:1px solid var(--accent);}
+  button.ghost:disabled{color:#a9a597; border-color:#c9c5b8; background:#fff;}
+  button.small{padding:4px 10px; margin:0; font-size:12px;}
+  .status{font-size:13px; color:var(--muted); margin-top:10px; min-height:1px;}
+  .status.error{color:var(--accent);}
+  .out{margin-top:12px; border:1px solid var(--border); border-radius:6px; background:#fbfaf7;}
+  .out-head{display:flex; justify-content:space-between; align-items:center; padding:6px 10px;
+    border-bottom:1px solid var(--border); font-size:12px; color:var(--muted); font-weight:600;}
+  .out pre{white-space:pre-wrap; word-wrap:break-word; margin:0; padding:12px 14px; font-size:13px;
+    font-family:inherit; max-height:440px; overflow-y:auto;}
+  .hidden{display:none;}
+  .hooks label{font-weight:400; font-size:13px; color:var(--text); margin:6px 0; cursor:pointer;
+    padding:7px 10px; border-radius:6px; border:1px solid var(--border); display:flex; gap:8px; align-items:flex-start;}
+  .hooks input{margin-top:3px;}
+  .hooks label:has(input:checked){border-color:var(--accent); background:var(--accent-bg);}
+  .sub-block{border-top:1px solid var(--border); padding-top:6px; margin-top:14px;}
+  .sub-block:first-of-type{border-top:none; margin-top:0; padding-top:0;}
+  .sub-block h3{font-size:13px; margin:8px 0 0; font-weight:600;}
+  .actions{display:flex; flex-wrap:wrap;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>UGC ad generator</h1>
+  <p class="sub">Enter a brand, then run the five prompt stages in order. Every step is a live Claude call using the prompts in the <code>/prompts</code> folder.</p>
+
+  <div class="card">
+    <h2><span class="step-num">i</span> Brand inputs</h2>
+    <label for="preset">Start from an example</label>
+    <select id="preset">
+      <option value="pureglow">PureGlow: Vitamin C serum (D2C skincare)</option>
+      <option value="salon">Lumière Hair Studio: keratin package (local salon)</option>
+      <option value="gadget">Voltix: slim power bank (D2C gadget)</option>
+      <option value="blank">Blank: enter your own brand</option>
+    </select>
+
+    <label for="brand_name">Brand name</label>
+    <input type="text" id="brand_name" maxlength="200">
+    <label for="product">Product / service</label>
+    <input type="text" id="product" maxlength="300">
+    <div class="row">
+      <div>
+        <label for="target_audience">Target audience</label>
+        <input type="text" id="target_audience" maxlength="400">
+      </div>
+      <div>
+        <label for="tone">Tone</label>
+        <input type="text" id="tone" maxlength="300">
+      </div>
+    </div>
+    <label for="key_benefit_or_transformation">Key benefit / transformation</label>
+    <input type="text" id="key_benefit_or_transformation" maxlength="400">
+    <label for="proof_point">Proof point (a real, honest detail the script can stand on)</label>
+    <input type="text" id="proof_point" maxlength="400">
+    <label for="offer_or_link">Offer / link (optional; leave blank if there is no active offer)</label>
+    <input type="text" id="offer_or_link" maxlength="300" placeholder="e.g. 20% off first order, link in bio">
+
+    <div id="access-row" class="hidden">
+      <label for="access_code">Access code (required by this server)</label>
+      <input type="password" id="access_code" autocomplete="off">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step-num">1</span> Generate hooks</h2>
+    <p class="hint">Eight scroll-stopping openers, each from a different angle.</p>
+    <button id="btn-hooks">Generate 8 hooks</button>
+    <div class="status" id="st-hooks"></div>
+    <div class="out hidden" id="out-hooks">
+      <div class="out-head"><span>All hooks</span><button class="ghost small copy" data-target="txt-hooks">Copy</button></div>
+      <pre id="txt-hooks"></pre>
+    </div>
+  </div>
+
+  <div class="card hidden" id="card-script">
+    <h2><span class="step-num">2</span> Pick a hook, write the script</h2>
+    <p class="hint">Choose one hook below, or type your own.</p>
+    <div id="hook-picker" class="hooks"></div>
+    <label for="custom-hook">Or write your own hook</label>
+    <input type="text" id="custom-hook" maxlength="300" placeholder="Leave blank to use the selected hook">
+    <button id="btn-script">Generate full script</button>
+    <div class="status" id="st-script"></div>
+    <div class="out hidden" id="out-script">
+      <div class="out-head"><span>Base script</span><button class="ghost small copy" data-target="txt-script">Copy</button></div>
+      <pre id="txt-script"></pre>
+    </div>
+  </div>
+
+  <div class="card hidden" id="card-more">
+    <h2><span class="step-num">3</span> Adapt, caption, and test</h2>
+    <p class="hint">These three run off the base script. Run any or all of them.</p>
+
+    <div class="sub-block">
+      <h3>Platform adaptations (Reels / TikTok / Shorts)</h3>
+      <button id="btn-platform" class="ghost">Adapt for platforms</button>
+      <div class="status" id="st-platform"></div>
+      <div class="out hidden" id="out-platform">
+        <div class="out-head"><span>Platform adaptations</span><button class="ghost small copy" data-target="txt-platform">Copy</button></div>
+        <pre id="txt-platform"></pre>
+      </div>
+    </div>
+
+    <div class="sub-block">
+      <h3>CTAs, captions, and hashtags</h3>
+      <button id="btn-cta" class="ghost">Generate CTAs and captions</button>
+      <div class="status" id="st-cta"></div>
+      <div class="out hidden" id="out-cta">
+        <div class="out-head"><span>CTAs and captions</span><button class="ghost small copy" data-target="txt-cta">Copy</button></div>
+        <pre id="txt-cta"></pre>
+      </div>
+    </div>
+
+    <div class="sub-block">
+      <h3>A/B variants</h3>
+      <button id="btn-ab" class="ghost">Generate A/B variants</button>
+      <div class="status" id="st-ab"></div>
+      <div class="out hidden" id="out-ab">
+        <div class="out-head"><span>A/B variants</span><button class="ghost small copy" data-target="txt-ab">Copy</button></div>
+        <pre id="txt-ab"></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="card hidden" id="card-export">
+    <h2><span class="step-num">4</span> Export</h2>
+    <p class="hint">Download everything generated so far as one Markdown content pack.</p>
+    <div class="actions">
+      <button id="btn-download">Download content pack (.md)</button>
+      <button id="btn-reset" class="ghost">Start over</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+
+  const FIELDS = ['brand_name', 'product', 'target_audience', 'tone',
+    'key_benefit_or_transformation', 'proof_point', 'offer_or_link'];
+
+  // Example brands for demonstration. Replace with real client details for real use.
+  const PRESETS = {
+    pureglow: {
+      brand_name: 'PureGlow',
+      product: 'Vitamin C Brightening Serum',
+      target_audience: 'Women 22-35, urban India, skincare-curious, price-conscious',
+      tone: 'Honest, slightly skeptical turned believer',
+      key_benefit_or_transformation: 'Visibly brighter, more even-looking skin in about 2 weeks of daily use',
+      proof_point: '10% stabilized Vitamin C',
+      offer_or_link: '',
+    },
+    salon: {
+      brand_name: 'Lumière Hair Studio',
+      product: 'Keratin smoothing treatment + haircut package',
+      target_audience: 'Working women 24-40 in Bangalore who are tired of daily frizz',
+      tone: 'Warm and chatty, like telling a friend about a find',
+      key_benefit_or_transformation: 'Smooth, easy-to-manage hair for months, not days',
+      proof_point: 'Every service starts with a stylist consultation and a patch test',
+      offer_or_link: '',
+    },
+    gadget: {
+      brand_name: 'Voltix',
+      product: '20,000mAh slim power bank with fast charging',
+      target_audience: 'College students and young professionals 18-30 in India',
+      tone: 'Casual, tech-curious, a little funny',
+      key_benefit_or_transformation: 'Phone stays charged all day without carrying a bulky brick',
+      proof_point: '20,000mAh capacity in a slim body',
+      offer_or_link: '',
+    },
+    blank: Object.fromEntries(FIELDS.map((f) => [f, ''])),
+  };
+
+  const state = { hooks: [], selectedHook: '', hooksRaw: '', script: '', platform: '', cta: '', ab: '' };
+
+  // ---------- helpers ----------
+  function applyPreset(name) {
+    const p = PRESETS[name] || PRESETS.blank;
+    FIELDS.forEach((f) => { $(f).value = p[f]; });
+  }
+
+  function readInputs() {
+    const v = {};
+    FIELDS.forEach((f) => { v[f] = $(f).value.trim(); });
+    return v;
+  }
+
+  function setStatus(id, msg, isError) {
+    const el = $(id);
+    el.textContent = msg || '';
+    el.classList.toggle('error', Boolean(isError));
+  }
+
+  function setBusy(ids, busy) {
+    ids.forEach((id) => { $(id).disabled = busy; });
+  }
+
+  function showOutput(key, text) {
+    $('txt-' + key).textContent = text;
+    $('out-' + key).classList.remove('hidden');
+  }
+
+  function hide(id) { $(id).classList.add('hidden'); }
+  function show(id) { $(id).classList.remove('hidden'); }
+
+  async function callApi(stage, variables) {
+    const headers = { 'Content-Type': 'application/json' };
+    const code = $('access_code').value.trim();
+    if (code) headers['x-access-code'] = code;
+
+    let res;
+    try {
+      res = await fetch('/api/run', { method: 'POST', headers, body: JSON.stringify({ stage, variables }) });
+    } catch (e) {
+      throw new Error('Could not reach the server. If you opened index.html straight from your files, run "npm start" and open http://localhost:3000 instead.');
+    }
+    let data = null;
+    try { data = await res.json(); } catch (e) { /* ignore */ }
+    if (!res.ok) throw new Error((data && data.error) || ('Request failed (' + res.status + ')'));
+    return data;
+  }
+
+  async function runStage({ stage, vars, buttons, status, onDone }) {
+    setBusy(buttons, true);
+    setStatus(status, 'Working... this usually takes 5 to 20 seconds.');
+    try {
+      const data = await callApi(stage, vars);
+      setStatus(status, data.truncated
+        ? 'Done, but the output hit the length limit. Increase MAX_TOKENS on the server for longer output.'
+        : '');
+      onDone(data.text);
+      show('card-export');
+    } catch (e) {
+      setStatus(status, e.message, true);
+    } finally {
+      setBusy(buttons, false);
+    }
+  }
+
+  function parseHooks(text) {
+    return text.split('\n')
+      .map((l) => l.replace(/\*\*/g, '').trim())
+      .filter((l) => /^\d+[.)]\s+/.test(l))
+      .map((l) => l.replace(/^\d+[.)]\s+/, ''));
+  }
+
+  function hookText(label) {
+    return label.replace(/^\[[^\]]*\]\s*/, '').replace(/^["“]|["”]$/g, '').trim();
+  }
+
+  function renderHooks() {
+    const picker = $('hook-picker');
+    picker.textContent = '';
+    state.hooks.forEach((h, i) => {
+      const label = document.createElement('label');
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'hookpick';
+      radio.value = String(i);
+      radio.addEventListener('change', () => { state.selectedHook = hookText(h); });
+      const span = document.createElement('span');
+      span.textContent = h;
+      label.appendChild(radio);
+      label.appendChild(span);
+      picker.appendChild(label);
+    });
+  }
+
+  function buildPack() {
+    const v = readInputs();
+    const lines = [];
+    lines.push('# UGC Ad Content Pack: ' + v.brand_name + ' ' + v.product, '');
+    lines.push('| Field | Detail |', '|---|---|');
+    lines.push('| Brand | ' + v.brand_name + ' |');
+    lines.push('| Product | ' + v.product + ' |');
+    lines.push('| Audience | ' + v.target_audience + ' |');
+    lines.push('| Tone | ' + v.tone + ' |');
+    lines.push('| Key benefit | ' + v.key_benefit_or_transformation + ' |');
+    lines.push('| Proof point | ' + v.proof_point + ' |', '');
+    const section = (title, body) => { if (body) lines.push('## ' + title, '', body, ''); };
+    section('1. Hooks', state.hooksRaw);
+    section('2. Full script', state.script);
+    section('3. Platform adaptations', state.platform);
+    section('4. CTAs and captions', state.cta);
+    section('5. A/B variants', state.ab);
+    return lines.join('\n');
+  }
+
+  function download(filename, text) {
+    const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function resetAll() {
+    Object.assign(state, { hooks: [], selectedHook: '', hooksRaw: '', script: '', platform: '', cta: '', ab: '' });
+    ['hooks', 'script', 'platform', 'cta', 'ab'].forEach((k) => { hide('out-' + k); $('txt-' + k).textContent = ''; setStatus('st-' + k, ''); });
+    ['card-script', 'card-more', 'card-export'].forEach(hide);
+    $('hook-picker').textContent = '';
+    $('custom-hook').value = '';
+  }
+
+  function requireScript(statusId) {
+    if (!state.script) { setStatus(statusId, 'Generate the script in step 2 first.', true); return false; }
+    return true;
+  }
+
+  // ---------- wiring ----------
+  $('preset').addEventListener('change', (e) => applyPreset(e.target.value));
+
+  $('btn-hooks').addEventListener('click', () => {
+    const v = readInputs();
+    runStage({
+      stage: 1,
+      vars: v,
+      buttons: ['btn-hooks'],
+      status: 'st-hooks',
+      onDone: (text) => {
+        state.hooksRaw = text;
+        state.hooks = parseHooks(text);
+        state.selectedHook = '';
+        showOutput('hooks', text);
+        renderHooks();
+        show('card-script');
+      },
+    });
+  });
+
+  $('btn-script').addEventListener('click', () => {
+    const hook = $('custom-hook').value.trim() || state.selectedHook;
+    if (!hook) { setStatus('st-script', 'Pick a hook above, or type your own.', true); return; }
+    runStage({
+      stage: 2,
+      vars: Object.assign(readInputs(), { chosen_hook: hook }),
+      buttons: ['btn-script'],
+      status: 'st-script',
+      onDone: (text) => {
+        state.script = text;
+        state.platform = state.cta = state.ab = '';
+        ['platform', 'cta', 'ab'].forEach((k) => hide('out-' + k));
+        showOutput('script', text);
+        show('card-more');
+      },
+    });
+  });
+
+  $('btn-platform').addEventListener('click', () => {
+    if (!requireScript('st-platform')) return;
+    runStage({
+      stage: 3,
+      vars: Object.assign(readInputs(), { base_script: state.script }),
+      buttons: ['btn-platform'],
+      status: 'st-platform',
+      onDone: (text) => { state.platform = text; showOutput('platform', text); },
+    });
+  });
+
+  $('btn-cta').addEventListener('click', () => {
+    if (!requireScript('st-cta')) return;
+    runStage({
+      stage: 4,
+      vars: readInputs(),
+      buttons: ['btn-cta'],
+      status: 'st-cta',
+      onDone: (text) => { state.cta = text; showOutput('cta', text); },
+    });
+  });
+
+  $('btn-ab').addEventListener('click', () => {
+    if (!requireScript('st-ab')) return;
+    runStage({
+      stage: 5,
+      vars: Object.assign(readInputs(), { base_script: state.script }),
+      buttons: ['btn-ab'],
+      status: 'st-ab',
+      onDone: (text) => { state.ab = text; showOutput('ab', text); },
+    });
+  });
+
+  $('btn-download').addEventListener('click', () => {
+    const slug = (readInputs().brand_name || 'ugc').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'ugc';
+    download(slug + '-ugc-content-pack.md', buildPack());
+  });
+
+  $('btn-reset').addEventListener('click', resetAll);
+
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.copy');
+    if (!btn) return;
+    const text = $(btn.dataset.target).textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = 'Copied';
+    } catch (err) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); btn.textContent = 'Copied'; } catch (e2) { btn.textContent = 'Copy failed'; }
+      ta.remove();
+    }
+    setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+  });
+
+  applyPreset('pureglow');
+
+  fetch('/api/config').then((r) => r.json()).then((cfg) => {
+    if (cfg && cfg.requiresAccessCode) show('access-row');
+  }).catch(() => { /* server not reachable; the first request will explain */ });
+})();
+</script>
+</body>
+</html>

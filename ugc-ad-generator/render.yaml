@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: ugc-ad-generator
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: GEMINI_API_KEY
+        sync: false        # your Google Gemini key (use this OR ANTHROPIC_API_KEY)
+      - key: ANTHROPIC_API_KEY
+        sync: false        # your Anthropic Claude key (leave empty if using Gemini)
+      - key: ACCESS_CODE
+        sync: false        # optional but recommended: a password for your public URL
